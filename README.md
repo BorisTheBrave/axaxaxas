@@ -27,3 +27,8 @@ TODO
  - Fast-first option
  - Handle infinite parses better.
 
+License
+-------
+MIT License (MIT)
+
+Copyright (c) 2015 Adam Newgas
