@@ -1,7 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath('../axaxaxas'))
+
 import unittest
-from earley_parser import parse, unparse, ParseRuleSet, NoParseError, AmbiguousParseError, InfiniteParseError, ParseTree
-import earley_parser
-from symbols import NonTerminal, Terminal
+from axaxaxas import parse, unparse, ParseRuleSet, NoParseError, AmbiguousParseError, InfiniteParseError, ParseTree, NonTerminal, Terminal
+import axaxaxas
 
 # The simplest possible lexer, for testing
 def lex(s):
@@ -12,9 +15,9 @@ def unlex(tokens):
     return " ".join(tokens)
 
 # Having names for the individual rules facilitates testing and debugging
-class ParseRule(earley_parser.ParseRule):
+class ParseRule(axaxaxas.ParseRule):
     def __init__(self, name, *args, **kwargs):
-        earley_parser.ParseRule.__init__(self, *args, **kwargs)
+        axaxaxas.ParseRule.__init__(self, *args, **kwargs)
         self.name = name
 
 

@@ -1,7 +1,6 @@
-# This is the example is explained in more detail in README.md
+# This is the example is explained in more detail in usage.rst
 
-from symbols import Terminal as T, NonTerminal as NT
-from earley_parser import ParseRule, ParseRuleSet
+from axaxaxas import ParseRule, ParseRuleSet, Terminal as T, NonTerminal as NT
 
 grammar = ParseRuleSet()
 grammar.add(ParseRule("sentence", [NT("noun"), NT("verb"), NT("noun")]))
@@ -11,7 +10,7 @@ grammar.add(ParseRule("verb", [T("bites")]))
 
 ###
 
-from earley_parser import parse
+from axaxaxas import parse
 parse_forest = parse(grammar, "sentence", "man bites dog".split())
 print(parse_forest.single())
 

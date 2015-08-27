@@ -18,8 +18,7 @@ For example, the following `Backus-Naur <https://en.wikipedia.org/wiki/Backus%E2
 
 Would be expressed::
 
-    from symbols import Terminal as T, NonTerminal as NT
-    from earley_parser import ParseRule, ParseRuleSet
+    from axaxaxas import ParseRule, ParseRuleSet, Terminal as T, NonTerminal as NT
 
     grammar = ParseRuleSet()
     grammar.add(ParseRule("sentence", [NT("noun"), NT("verb"), NT("noun")]))
@@ -36,7 +35,7 @@ Often a formal lexer is not needed - we can use ``string.split`` to produce list
 
 The parser is invoked with the `parse` function::
 
-    from earley_parser import parse
+    from axaxaxas import parse
     parse_forest = parse(grammar, "sentence", "man bites dog".split())
 
     print(parse_forest.single())

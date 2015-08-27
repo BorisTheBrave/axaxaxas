@@ -3,7 +3,7 @@ Reference
 Parsing
 -------
 
-.. module:: earley_parser
+.. module:: axaxaxas
 
 .. autoclass:: ParseRule
     :members:
@@ -54,8 +54,6 @@ Building
 
 Symbols
 -------
-
-.. module:: symbols
 
 .. autoclass:: Symbol
     :members:

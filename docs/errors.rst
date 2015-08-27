@@ -4,8 +4,8 @@ Errors and Edge Cases
 =====================
 
 There are 3 possible ways that parsing can fail. All of them raise subclasses of `ParseError`. All instances
-of `ParseError` contain a :attr:`~earley_parser.ParseError.message`, and fields
-:attr:`~earley_parser.ParseError.start_index`, :attr:`~earley_parser.ParseError.end_index` indicating where in
+of `ParseError` contain a :attr:`~axaxaxas.ParseError.message`, and fields
+:attr:`~axaxaxas.ParseError.start_index`, :attr:`~axaxaxaseError.end_index` indicating where in
 the token stream the error is occurring.
 
 No parse
