@@ -11,6 +11,8 @@ The main goals of this implementation are ease of use, customization, and requir
 for the grammar. You may find the 
 [Marpa](https://jeffreykegler.github.io/Marpa-web-site/) project better suits high performance needs.
 
+Documentation can be found at http://axaxaxas.readthedocs.org
+
 Features
 --------
  - Complete Earley Parser implemenation
