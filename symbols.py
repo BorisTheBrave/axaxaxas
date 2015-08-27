@@ -59,6 +59,7 @@ class Terminal(Symbol):
     is_terminal = True
 
     def match(self, token):
+        """Returns true if token is matched by this Terminal"""
         return token == self.token
 
     def __repr__(self):

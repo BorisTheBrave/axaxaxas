@@ -4,11 +4,15 @@ from abc import ABCMeta, abstractmethod
 
 
 class ParseRule:
+    """Represents a single production in a context free grammar."""
     def __init__(self, head, symbols, *,
                  # Rudimentary ambiguity resolution
                  penalty=0):
+        #: The left-hand-side of the production, a string indicating the name of the symbol produced.
         self.head = head
+        #: The right-hand-side of the production, a list of terminals and non-terminals (symbols).
         self.symbols = symbols
+        #: The numeric penalty assigned to this rule when resolving ambiguity.
         self.penalty = penalty
 
     def __repr__(self):
@@ -19,8 +23,12 @@ class ParseRule:
 
 
 class ParseTree:
+    """Tree structure representing a sucessfully parsed rule"""
     def __init__(self, rule, children=None):
+        #: The `ParseRule` matched against.
         self.rule = rule
+        #: Tuple of matched items, one for each symbol of `rule`. Each item
+        #: is either a token, a `ParseTree`, None or a tuple.
         self.children = children or tuple()
 
     def extend(self, child):
@@ -43,28 +51,39 @@ class ParseTree:
 
 
 class ParseError(Exception):
+    """Base parse error"""
     def __init__(self, message, start_index, end_index):
         super(ParseError, self).__init__(message)
+        #: A text description of the error
         self.message = message
+        #: Index of the first token where the problem is
         self.start_index = start_index
+        #: Index of the last token where the problem is
         self.end_index = end_index
 
 class AmbiguousParseError(ParseError):
+    """Indicates that there were multiple possible parses in a context that requires only one"""
     def __init__(self, message, start_index, end_index, values):
         super(AmbiguousParseError, self).__init__(message, start_index, end_index)
+        #: A list of all the ambiguous parse trees.
+        #: Note that these parsetrees are subtrees of the entire parse, and may
+        #: be only partially constructed
         self.values = values
 
-
-
 class NoParseError(ParseError):
+    """Indicates there were no possible parses"""
     def __init__(self, message, start_index, end_index, encountered, expected_terminals, expected):
         super(NoParseError, self).__init__(message, start_index, end_index)
+        #: The token that we failed at, or ``None`` for end of stream.
         self.encountered = encountered
+        #: List of all terminal symbols that tried and failed to match `encountered`
         self.expected_terminals = expected_terminals
+        #: List of terminal and non-terminal symbols summarizing `expected_terminals`
         self.expected = expected
 
 
 class InfiniteParseError(ParseError):
+    """Indicates there were infinite possible parses"""
     pass
 
 BuilderContext = namedtuple("BuilderContext",[
@@ -75,32 +94,40 @@ BuilderContext = namedtuple("BuilderContext",[
 ])
 
 class Builder(metaclass=ABCMeta):
+    """Abstract base class for constructing parse trees and other objects from a `ParseForest`.
+    See :ref:`builders` for more details."""
     @abstractmethod
     def start_rule(self, context):
+        """Called when a new rule is started"""
         pass
 
     @abstractmethod
     def terminal(self, context, token):
+        """Called when a terminal is matched"""
         pass
 
     @abstractmethod
     def skip_optional(self, context, prev_value):
+        """Called when an ``optional`` symbol is skipped over"""
         pass
 
     @abstractmethod
     def begin_multiple(self, context, prev_value):
-        pass
+        """Called when a ``plus`` or ``star`` symbols is enountered"""
 
     @abstractmethod
     def end_multiple(self, context, prev_value):
+        """Called when there are no more matches for a ``plus`` or ``star`` symbol"""
         pass
 
     @abstractmethod
     def extend(self, context, prev_value, extension_value):
+        """Called when a symbol is matched. Potentially multiple times for a ``star`` or ``plus`` symbol"""
         pass
 
     @abstractmethod
     def merge(self, context, values):
+        """Called when multiple possible parses could provide a match"""
         pass
 
 
@@ -189,6 +216,8 @@ class ListBuilder(Builder):
         return results
 
 def make_list_builder(builder):
+    """Takes a `Builder` which lacks an implemenation for `merge`, and returns a new `Builder` that
+    will accumulate all possible built parse trees into a list"""
     return ListBuilder(builder)
 
 # Mini Stackless lazy evaluation framework
@@ -285,10 +314,12 @@ class IterBuilder(Builder):
         return thunk_flatten(thunk_iter(values))
 
 def make_iter_builder(builder):
+    """Takes a `Builder` which lacks an implemenation for `merge`, and returns a new `Builder` that
+    will accumulate all possible built parse trees into an iterator."""
     return IterBuilder(builder)
 
 class ParseForest:
-    """Represents a collection of related ParseTrees"""
+    """Represents a collection of related `ParseTree` objects."""
     # The PartialRule objects themselves already form the forest. This just adds post processing
     # to that data structure for a variety of effects, plus a nicer API.
     def __init__(self, top_partial_rule):
@@ -304,15 +335,15 @@ class ParseForest:
         self._trim_loops()
 
     def single(self):
-        """Returns the only ParseTree in the collection, or throws if there are multiple"""
+        """Returns the only `ParseTree` in the collection, or throws if there are multiple."""
         return self.apply(SingleParseTreeBuilder())
 
     def all(self):
-        """Returns a list of the contained ParseTree objects"""
+        """Returns a list of the contained `ParseTree` objects"""
         return self.apply(make_list_builder(SingleParseTreeBuilder()))
 
     def count(self):
-        """Returns a count of the contained ParseTree objects"""
+        """Returns a count of the contained `ParseTree` objects"""
         return self.apply(CountingBuilder())
 
     @property
@@ -320,6 +351,7 @@ class ParseForest:
         return len(self.dests)
 
     def __iter__(self):
+        """Iterators over the list of contained `ParseTree` objects. Calling `all` is somewhat faster"""
         thunk_iterator = self.apply(make_iter_builder(SingleParseTreeBuilder()))
         while True:
             cons = thunk_iterator.force()
@@ -332,6 +364,7 @@ class ParseForest:
         return self.count()
 
     def apply(self, builder):
+        """Constructs a result step at a time using the given `Builder`."""
         memo = {}
         stack = [(self.top_partial_rule, True)]
         while stack:
@@ -670,18 +703,21 @@ class PartialRule:
 
 
 class ParseRuleSet:
-    """Stores a set of rules, with fast retrieval by rule head"""
+    """Stores a set of `ParseRule`, with fast retrieval by rule head"""
     def __init__(self):
         self._rules = defaultdict(list)
 
     def get(self, head, lookahead_token=None):
+        """Returns a list of `ParseRule` objects with matching head"""
         return self._rules[head]
 
     def add(self, rule):
+        """Adds a new `ParseRule` to the set"""
         self._rules[rule.head].append(rule)
         rule.priority = len(self._rules[rule.head])
 
     def is_anonymous(self, head):
+        """Returns true if a given head symbol should be omitted from error reporting"""
         return False
 
 
@@ -718,6 +754,7 @@ class GammaNonTerminal:
     prefer_late = False
 
 def unparse(parse_tree):
+    """Converts a `ParseTree` back to a list of tokens"""
     if isinstance(parse_tree, (tuple, list)):
         results = []
         for r in map(unparse, parse_tree):
@@ -750,6 +787,8 @@ def unparse(parse_tree):
 # TODO: Apply this optimization? http://loup-vaillant.fr/tutorials/earley-parsing/right-recursion
 
 def parse(rule_set, head, tokens, *, fail_if_empty=True):
+    """Parses a stream of ``tokens`` according to the grammer in ``rule_set`` by attempting to match
+    the non-terminal specified by ``head``."""
     # Returns a PartialRule that represents a parse forest
 
     token_stream = list(tokens)
