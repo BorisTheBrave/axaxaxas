@@ -997,5 +997,7 @@ __all__ = [
     "Builder",
     "make_list_builder",
     "make_iter_builder",
-    "symbols",
+    "Symbol",
+    "NonTerminal",
+    "Terminal",
 ]
