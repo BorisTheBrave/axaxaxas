@@ -47,9 +47,16 @@ class EarleyParserTestCase(unittest.TestCase):
         round_trip = unlex(unparse(parse(self.p, "top", lex(text)).single()))
         self.assertEqual(text.strip(), round_trip.strip())
 
-    def ambig(self, text):
-        with self.assertRaises(AmbiguousParseError):
+    def ambig(self, text, start_index=None, end_index=None, values=None):
+        with self.assertRaises(AmbiguousParseError) as cm:
             parse(self.p, "top", lex(text)).single()
+        e = cm.exception
+        if start_index is not None:
+            self.assertEqual(e.start_index, start_index)
+        if end_index is not None:
+            self.assertEqual(e.end_index, end_index)
+        if values is not None:
+            self.assertEqual(e.values, values)
 
     def no_parse(self, text, at_index, encountered=None, expected_terminals=None, expected=None):
         with self.assertRaises(NoParseError) as cm:
@@ -91,8 +98,24 @@ class EarleyParserTestCase(unittest.TestCase):
         p = self.p
         p.add(ParseRule("top","top",[Terminal("a")]))
         p.add(ParseRule("top","top",[Terminal("a")]))
-    
+
         self.ambig("a")
+
+    def test_ambig_highlight(self):
+        p = self.p
+        p.add(ParseRule("top","top", [Terminal("a"), NonTerminal("a"), Terminal("a")]))
+        p.add(ParseRule("1","a", [Terminal("a")]))
+        p.add(ParseRule("2","a", [Terminal("a")]))
+
+        self.ambig("a a a", start_index=1, end_index=2)
+
+    def test_ambig_highlight2(self):
+        p = self.p
+        p.add(ParseRule("top","top", [Terminal("a"), NonTerminal("a"), Terminal("a")]))
+        p.add(ParseRule("top","top", [Terminal("a"), NonTerminal("a"), Terminal("a")]))
+        p.add(ParseRule("1","a", [Terminal("a")]))
+
+        self.ambig("a a a", start_index=0, end_index=3)
 
     def test_classic_1(self):
         # From https://web.archive.org/web/20130508170633/http://thor.info.uaic.ro/~grigoras/diplome/5.pdf

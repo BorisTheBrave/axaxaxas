@@ -27,7 +27,10 @@ To use builders, you must define your own builder class inheriting from `Builder
         def extend(self, context, prev_value, extension_value):
             ...
 
-        def merge(self, context, values):
+        def merge_vertical(self, context, values):
+            ...
+
+        def merge_horizontal(self, context, values):
             ...
 
 Then you can run your builder against a parse forest using `ParseForest.apply`. The parse forest will then invoke
@@ -49,8 +52,8 @@ First apply will call `start_rule` for the matched rule. The result from that is
  - `skip_optional` is called in place of `extend` when an ``optional`` symbol is skipped over.
  - `begin_multiple` and `end_multiple` are caused when a ``star`` or ``plus`` symbol is first encountered and left.
    Between them, any number of `extend` calls may be made, all corresponding to the same symbol.
- - `merge` is called when there is an ambiguity in the grammar, and multiple possible parses reach the same point
-   (and are hereafter shared).
+ - `merge_vertical` and `merge_horizontal` are called when there is an ambiguity in the grammar, and multiple possible
+   parses reach the same point (and are hereafter shared).
 
 
 You may find it easier to study the definitions of ``CountingBuilder`` and ``SingleParseTree`` builder, which are
@@ -92,6 +95,11 @@ as the call may be used in several contexts. This is also why it is important no
 as it may be used in other contexts. You should always return a fresh value that represents whatever change you
 need to make to prev value.
 
+`merge_vertical` is called when there are multiple possible `ParseRule` objects with the same head that match the same
+sequence of tokens. The BuilderContext indicates the non terminal symbol they both match. Conversely,
+`merge_horizontal` is called when there are multiple possible parses for a single `ParseRule`. In most use cases,
+these methods will share the same implementation.
+
 Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` by grammar::
 
     rule1 = ParseRule("sentence", [T("hello")])
@@ -103,14 +111,15 @@ Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` 
     v4 = builder.start_rule({rule2, 0})
     v5 = builder.terminal({rule2, 0}, "hello")
     v6 = builder.extend({rule2, 0}, v4, v5)
-    v7 = builder.merge({None, 0}, [v3, v6])
+    v7 = builder.merge_vertical({None, 0}, [v3, v6])
 
-(Note this this special case where the top level symbol itself is ambiguous, then ``None`` is passed in as the rule
+(Note that in this special case where the top level symbol itself is ambiguous, then ``None`` is passed in as the rule
 being merged).
 
-You can handle ambiguity directly using the `merge` method of builder. But a common form of handling is to simply
-treat possible every parse tree independently, and just return an list or iterator of the result for each parse tree.
-Utility methods `make_list_builder` and `make_iter_builder`. Just pass them a builder which has no ambiguity handling
+You can handle ambiguity directly using the `merge_vertical` and `merge_horizontal` method of builder.
+But a common form of handling is to simply treat possible every parse tree independently, and just return an list or
+iterator of the result for each parse tree. Utility methods `make_list_builder` and `make_iter_builder` let you
+do exactly that. Just pass them a builder which has no ambiguity handling
 and they return a new builder that invokes the original builder and combines the results efficiently into a list or
 iterator. They directly correspond to the `ParseForest.all` and `ParseForest.__iter__` methods.
 

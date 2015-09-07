@@ -201,8 +201,13 @@ class Builder(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def merge(self, context, values):
-        """Called when multiple possible parses could provide a match"""
+    def merge_vertical(self, context, values):
+        """Called when multiple possible `ParseRule` objects could match a non terminal"""
+        pass
+
+    @abstractmethod
+    def merge_horizontal(self, context, values):
+        """Called when there are multiple possible parses of a `ParseRule`."""
         pass
 
 
@@ -226,7 +231,10 @@ class CountingBuilder(Builder):
     def extend(self, context, prev_value, extension_value):
         return prev_value * extension_value
 
-    def merge(self, context, values):
+    def merge_vertical(self, context, values):
+        return sum(values)
+
+    def merge_horizontal(self, context, values):
         return sum(values)
 
 
@@ -253,8 +261,10 @@ class SingleParseTreeBuilder(Builder):
         else:
             return prev_value.extend(extension_value)
 
-    def merge(self, context, values):
-        # TODO: Exact location
+    def merge_vertical(self, context, values):
+        raise AmbiguousParseError("Ambiguous parse.", context.start_index, context.end_index, values)
+
+    def merge_horizontal(self, context, values):
         raise AmbiguousParseError("Ambiguous parse.", context.start_index, context.end_index, values)
 
 class ListBuilder(Builder):
@@ -284,15 +294,22 @@ class ListBuilder(Builder):
                 results.append(self.underlying.extend(context, prev_underlying, extension_underlying))
         return results
 
-    def merge(self, context, values):
+    def merge_vertical(self, context, values):
         results = []
         for value in values:
             results.append(value)
         return results
 
+    def merge_horizontal(self, context, values):
+        results = []
+        for value in values:
+            results.append(value)
+        return results
+
+
 def make_list_builder(builder):
-    """Takes a `Builder` which lacks an implemenation for `merge`, and returns a new `Builder` that
-    will accumulate all possible built parse trees into a list"""
+    """Takes a `Builder` which lacks an implementation for `merge_horizontal` and `merge_vertical`, and returns a
+    new `Builder` that will accumulate all possible built parse trees into a list"""
     return ListBuilder(builder)
 
 # Mini Stackless lazy evaluation framework
@@ -385,12 +402,15 @@ class IterBuilder(Builder):
     def extend(self, context, prev_value, extension_value):
         return thunk_cross(prev_value, extension_value, partial(self.underlying.extend, context))
 
-    def merge(self, context, values):
+    def merge_vertical(self, context, values):
+        return thunk_flatten(thunk_iter(values))
+
+    def merge_horizontal(self, context, values):
         return thunk_flatten(thunk_iter(values))
 
 def make_iter_builder(builder):
-    """Takes a `Builder` which lacks an implemenation for `merge`, and returns a new `Builder` that
-    will accumulate all possible built parse trees into an iterator."""
+    """Takes a `Builder` which lacks an implemenation for `merge_horizontal` and `merge_vertical`, and returns a
+    new `Builder` that will accumulate all possible built parse trees into an iterator."""
     return IterBuilder(builder)
 
 class ParseForest:
@@ -459,8 +479,19 @@ class ParseForest:
                         if isinstance(source1, PartialRule):
                             stack.append((source1, True))
             else:
-                values = []
+                skip_sentinel = object()
+                values_by_source0 = defaultdict(list)
                 for source0, source1 in current_rule.sources:
+                    if source1 is None:
+                        value1 = skip_sentinel
+                    else:
+                        if isinstance(source1, PartialRule):
+                            value1 = memo[source1]
+                        else:
+                            value1 = builder.terminal(context, source1)
+                    values_by_source0[id(source0), source0].append(value1)
+                values = []
+                for (_, source0), current_values in values_by_source0.items():
                     if isinstance(source0, PartialRule):
                         value0 = memo[source0]
                     else:
@@ -468,30 +499,36 @@ class ParseForest:
                     rule = source0.rule
                     next_symbol = source0.next_symbol
                     symbol_index = source0.state
-                    context = BuilderContext(rule,symbol_index,source0.start_index, source0.end_index)
+                    context = BuilderContext(rule, symbol_index, source0.start_index, source0.end_index)
                     if next_symbol.multiple and source0.sub_state == 0:
                         # This was the first call to skip/extend, need to actually create the array
                         value0 = builder.begin_multiple(context, value0)
-                    if source1 is None:
+
+                    has_skip = any(value is skip_sentinel for value in current_values)
+                    has_non_skip = any(value is not skip_sentinel for value in current_values)
+                    assert has_skip != has_non_skip
+
+                    if has_skip:
+                        assert len(current_values) == 1
                         if next_symbol.multiple:
-                            values.append(builder.end_multiple(context, value0))
+                            value = builder.end_multiple(context, value0)
                         else:
-                            values.append(builder.skip_optional(context, value0))
-                        continue
-                    if isinstance(source1, PartialRule):
-                        value1 = memo[source1]
+                            value = builder.skip_optional(context, value0)
                     else:
-                        value1 = builder.terminal(context, source1)
-                    if is_gamma:
-                        values.append(value1)
-                    else:
-                        values.append(builder.extend(context, value0, value1))
+                        if len(current_values) == 1:
+                            value = current_values[0]
+                        else:
+                            context = BuilderContext(rule, current_rule.state - 1, source0.end_index, current_rule.end_index)
+                            value = builder.merge_vertical(context, current_values)
+                        if not is_gamma:
+                            value = builder.extend(context, value0, value)
+                    values.append(value)
                 if len(values) == 1:
                     value = values[0]
                 else:
-                    rule = current_rule.rule if not is_gamma else None
-                    context = BuilderContext(rule, current_rule.state - 1, current_rule.start_index, current_rule.end_index)
-                    value = builder.merge(context, values)
+                    assert not is_gamma
+                    context = BuilderContext(rule, current_rule.state, current_rule.start_index, current_rule.end_index)
+                    value = builder.merge_horizontal(context, values)
                 memo[current_rule] = value
         return memo[self.top_partial_rule]
 
