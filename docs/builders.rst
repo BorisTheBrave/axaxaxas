@@ -27,12 +27,6 @@ To use builders, you must define your own builder class inheriting from `Builder
         def extend(self, context, prev_value, extension_value):
             ...
 
-        def merge_vertical(self, context, values):
-            ...
-
-        def merge_horizontal(self, context, values):
-            ...
-
 Then you can run your builder against a parse forest using `ParseForest.apply`. The parse forest will then invoke
 methods on your builder as it walks over the possible parse tree. Each method is given some context, and the
 value currently being built, and returns a new value updated for what occured in the parse.
@@ -43,7 +37,7 @@ The passed ``context`` is a `BuilderContext` with fields `rule <BuilderContext.r
 `end_index <BuilderContext.end_index>` that give details about where in the rule and where in the token stream
 this invocation is occuring.
 
-First apply will call `start_rule` for the matched rule. The result from that is passed to the other methods.
+First `apply` will call `start_rule` for the matched rule. The result from that is passed to the other methods.
 
  - `start_rule` is called at the start of each parsed rule.
  - `terminal` is called when a terminal is parsed.
@@ -52,8 +46,6 @@ First apply will call `start_rule` for the matched rule. The result from that is
  - `skip_optional` is called in place of `extend` when an ``optional`` symbol is skipped over.
  - `begin_multiple` and `end_multiple` are caused when a ``star`` or ``plus`` symbol is first encountered and left.
    Between them, any number of `extend` calls may be made, all corresponding to the same symbol.
- - `merge_vertical` and `merge_horizontal` are called when there is an ambiguity in the grammar, and multiple possible
-   parses reach the same point (and are hereafter shared).
 
 
 You may find it easier to study the definitions of ``CountingBuilder`` and ``SingleParseTree`` builder, which are
@@ -88,17 +80,26 @@ Then the following methods would get invoked during `apply` (though not necessar
 
 Ambiguity
 ---------
-
 When there are multiple possible parse trees, sequences of builder results that are shared between parse trees
-will only get invoked once, then stored and re-used. This is why some context is omitted from builder calls,
+will only get invoked once, then stored and re-used. This is why some context is omitted from builder methods,
 as the call may be used in several contexts. This is also why it is important not to mutate the passed in prev_value,
 as it may be used in other contexts. You should always return a fresh value that represents whatever change you
 need to make to prev value.
 
-`merge_vertical` is called when there are multiple possible `ParseRule` objects with the same head that match the same
-sequence of tokens. The BuilderContext indicates the non terminal symbol they both match. Conversely,
-`merge_horizontal` is called when there are multiple possible parses for a single `ParseRule`. In most use cases,
-these methods will share the same implementation.
+The easiest way to handle amiguity is to use utility methods `make_list_builder` and `make_iter_builder`. These methods
+accept a builder with no ambiguity handling, and returns a new builder that simply treats every possible parse tree
+independently, and return a list or iterable respectively. They directly correspond to the `ParseForest.all` and
+`ParseForest.__iter__` methods, which include some additional details.
+
+If you do wish to directly handle ambiguity. You must override either the `merge` method, or both the
+`merge_horizontal` and `merge_vertical` methods. All these methods work the same way: you are passed a list of values
+that each represent an alternative parse of the same sequence of tokens for the same parse rule or symbol, and you
+must return a single value aggregating them.
+
+A merge is "vertical", and calls `merge_vertical` when there are multiple possible `ParseRule` objects with the same
+head that match the same sequence of tokens. The `BuilderContext` indicates the non terminal symbol they both match.
+Conversely, `merge_horizontal` is called when there are multiple possible parses for a single `ParseRule`. In most use
+cases, these methods will share the same implementation, so you are free to override `merge` instead.
 
 Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` by grammar::
 
@@ -116,10 +117,28 @@ Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` 
 (Note that in this special case where the top level symbol itself is ambiguous, then ``None`` is passed in as the rule
 being merged).
 
-You can handle ambiguity directly using the `merge_vertical` and `merge_horizontal` method of builder.
-But a common form of handling is to simply treat possible every parse tree independently, and just return an list or
-iterator of the result for each parse tree. Utility methods `make_list_builder` and `make_iter_builder` let you
-do exactly that. Just pass them a builder which has no ambiguity handling
-and they return a new builder that invokes the original builder and combines the results efficiently into a list or
-iterator. They directly correspond to the `ParseForest.all` and `ParseForest.__iter__` methods.
+Here's another example, ambiguously parsing ``["a"]``::
 
+    sentence = ParseRule("sentence", [NT("X"),NT("Y")])
+    X        = ParseRule("X", [T("a", optional=True)])
+    Y        = ParseRule("Y", [T("a", optional=True)])
+
+    v1  = builder.start_rule({sentence, 0})
+    v2  = builder.start_rule({X, 0})
+    v3  = builder.terminal({X, 0}, "a")
+    v4  = builder.extend({X, 0}, v2, v3)
+    v5  = builder.extend({sentence, 0}, v1, v4)
+    v6  = builder.skip_optional({X, 0}, v2)
+    v7  = builder.extend({sentence, 0}, v1, v6)
+    v8  = builder.start_rule({Y, 0})            # Before token 0
+    v9  = builder.terminal({Y, 0}, "a")
+    v10 = builder.extend({Y, 0}, v8, v9)
+    v11 = builder.extend({sentence, 1}, v7, v10)
+    v12 = builder.start_rule({Y, 0})            # After token 0
+    v13 = builder.skip_optional({Y, 0}, v12)
+    v14 = builder.extend({sentence, 1}, v5, v13)
+    v15 = builder.merge_horizontal({sentence, 2}, [v11, v14])
+
+The two above examples give a visual indication of the terminology "vertical" and "horizontal". In the first,
+``rule1`` and ``rule2`` are ambiguous and in vertically column in the grammar definition. In the second, ``X`` and
+``Y`` are ambiguous, and are horizontally next to each other in a single grammar rule.

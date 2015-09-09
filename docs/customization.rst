@@ -23,7 +23,7 @@ you may have terminals that match entire classes of tokens.
 Customizing ParseTrees
 ----------------------
 There is no way to customize the `ParseTree` class. But you can avoid using it entirely by writing your own
-Builder. Builders specify a semantic action to take at each step of the parse, allowing you to build your own
+`Builder`. Builders specify a semantic action to take at each step of the parse, allowing you to build your own
 parse trees or abstract syntax trees directly from a `ParseForest`. See :ref:`builders`
 for more details.
 
@@ -31,7 +31,7 @@ Customizing Grammars
 --------------------
 
 You can override `ParseRuleSet.get` with anything that returns a list of `ParseRule` objects. As there is no
-preprocessing done on the rules, you can generate an a grammar on the fly. You can use this feature to parse
+preprocessing done on the rules, you can generate a grammar on the fly. You can use this feature to parse
 context sensitive grammars, by passing any relevant context as part of the head, and adjusting the non-terminals
 of the returned rules to forward on relevant context. This will probably lead to very long parse times unless
 care is applied.

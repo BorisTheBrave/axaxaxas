@@ -30,7 +30,7 @@ possible parse trees. However, if you call `ParseForest.single` and there is amb
 will be thrown. It will indicate the earliest possible ambiguity, but there may be others. The error will contain a
 field called `values` containing the possible alternatives parses. However, it only contains a subtree of the full parse
 tree, and additionally, it may be only halfway through building a rule, so the subtree may be missing elements.
-These limitations ensure that `values` is the short list. It is recommended you do not use `ParseForest.single` if
+These limitations ensure that `values` is a short list. It is recommended you do not use `ParseForest.single` if
 you need more detail on ambiguity.
 
 Infinite Parse

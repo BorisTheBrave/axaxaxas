@@ -33,5 +33,5 @@ Builders
 --------
 
 :ref:`builders` are an advanced API that give you fine control over interpreting the parse. You can explicitly
-control behaviour in ambiguity by handling `Builder.merge`.
+control behaviour in ambiguity by handling `Builder.merge()`.
 

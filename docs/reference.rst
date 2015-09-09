@@ -42,7 +42,6 @@ Building
 --------
 
 .. autoclass:: BuilderContext
-    :members:
 
 .. autoclass:: Builder
     :members:

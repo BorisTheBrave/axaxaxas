@@ -124,7 +124,7 @@ Penalty
 
 As mentioned above, greedy and related settings only trim ambiguity when the two options have so far parsed identically.
 
-In some circumstances, you wish to avoid a particular, no matter how different the alternatives are. You can associate
+In some circumstances, you wish to avoid a particular rule, no matter how different the alternatives are. You can associate
 a penalty with each rule. The parser sums up all the penalties associated with a given parse, and choose only possibly
 parses with the lowest sum. This can have wide ranging effects on eliminating ambiguity. Penalties can be viewed as very
 lightweight support for probabilistic parsing::

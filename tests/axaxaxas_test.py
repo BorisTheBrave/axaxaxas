@@ -117,6 +117,13 @@ class EarleyParserTestCase(unittest.TestCase):
 
         self.ambig("a a a", start_index=0, end_index=3)
 
+    def test_ambig_horiz(self):
+        p = self.p
+        p.add(ParseRule("top","top", [NonTerminal("X"),NonTerminal("Y")]))
+        p.add(ParseRule("X", "X", [Terminal("x"), Terminal("a", optional=True)]))
+        p.add(ParseRule("Y", "Y", [Terminal("a", optional=True), Terminal("y")]))
+        self.ambig("x a y", start_index=0, end_index=3)
+
     def test_classic_1(self):
         # From https://web.archive.org/web/20130508170633/http://thor.info.uaic.ro/~grigoras/diplome/5.pdf
         p = self.p

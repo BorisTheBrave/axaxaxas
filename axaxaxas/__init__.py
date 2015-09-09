@@ -40,6 +40,8 @@ class Symbol:
 
 
 class NonTerminal(Symbol):
+    """Represents a non-terminal symbol in the grammar, matching tokens according to
+    any ParseRules with the specified `head`"""
     def __init__(self, head, prefer_early=False, prefer_late=False, **kwargs):
         Symbol.__init__(self, **kwargs)
         self.head = head
@@ -57,6 +59,7 @@ class NonTerminal(Symbol):
 
 
 class Terminal(Symbol):
+    """Represents a terminal symbol in the grammar, matching a single token of the input"""
     def __init__(self, token, **kwargs):
         Symbol.__init__(self, **kwargs)
         self.token = token
@@ -167,6 +170,26 @@ BuilderContext = namedtuple("BuilderContext",[
     "start_index",
     "end_index",
 ])
+BuilderContext.__doc__ = """Contains information about the location and rule currently being parsed. The exact
+meaning is specific to each method of `Builder`.
+
+.. py:attribute:: rule
+
+    The relevant `ParseRule`. Can be ``None`` for `merge_vertical` calls at the top level.
+
+.. py:attribute:: symbol_index
+
+    ``context.rule.symbols[context.symbol_index]`` indicates the relevant symbol of the rule. Note `symbol_index`
+    may be ``len(context.rule.symbols)`` in some circumstances.
+
+.. py:attribute:: start_index
+
+    The first token in the relevant range of tokens.
+
+.. py:attribute:: end_index
+
+    After the last token in the relevant range of tokens.
+"""
 
 class Builder(metaclass=ABCMeta):
     """Abstract base class for constructing parse trees and other objects from a `ParseForest`.
@@ -200,15 +223,18 @@ class Builder(metaclass=ABCMeta):
         """Called when a symbol is matched. Potentially multiple times for a ``star`` or ``plus`` symbol"""
         pass
 
-    @abstractmethod
+    def merge(self, context, values):
+        """Called when there are multiple possible parses, unless `merge_vertical` and
+        `merge_horizontal` is overriden."""
+        raise AmbiguousParseError("Ambiguous parse.", context.start_index, context.end_index, values)
+
     def merge_vertical(self, context, values):
         """Called when multiple possible `ParseRule` objects could match a non terminal"""
-        pass
+        return self.merge(context, values)
 
-    @abstractmethod
     def merge_horizontal(self, context, values):
         """Called when there are multiple possible parses of a `ParseRule`."""
-        pass
+        return self.merge(context, values)
 
 
 class CountingBuilder(Builder):
@@ -261,12 +287,6 @@ class SingleParseTreeBuilder(Builder):
         else:
             return prev_value.extend(extension_value)
 
-    def merge_vertical(self, context, values):
-        raise AmbiguousParseError("Ambiguous parse.", context.start_index, context.end_index, values)
-
-    def merge_horizontal(self, context, values):
-        raise AmbiguousParseError("Ambiguous parse.", context.start_index, context.end_index, values)
-
 class ListBuilder(Builder):
     """Wraps another builder, adding ambiguity support by producing lists of values"""
     def __init__(self, underlying):
@@ -294,18 +314,11 @@ class ListBuilder(Builder):
                 results.append(self.underlying.extend(context, prev_underlying, extension_underlying))
         return results
 
-    def merge_vertical(self, context, values):
+    def merge(self, context, values):
         results = []
         for value in values:
             results.append(value)
         return results
-
-    def merge_horizontal(self, context, values):
-        results = []
-        for value in values:
-            results.append(value)
-        return results
-
 
 def make_list_builder(builder):
     """Takes a `Builder` which lacks an implementation for `merge_horizontal` and `merge_vertical`, and returns a
@@ -402,10 +415,7 @@ class IterBuilder(Builder):
     def extend(self, context, prev_value, extension_value):
         return thunk_cross(prev_value, extension_value, partial(self.underlying.extend, context))
 
-    def merge_vertical(self, context, values):
-        return thunk_flatten(thunk_iter(values))
-
-    def merge_horizontal(self, context, values):
+    def merge(self, context, values):
         return thunk_flatten(thunk_iter(values))
 
 def make_iter_builder(builder):
