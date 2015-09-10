@@ -12,6 +12,9 @@ To use builders, you must define your own builder class inheriting from `Builder
         def start_rule(self, context):
             ...
 
+        def end_rule(self, context, prev_value):
+            ...
+
         def terminal(self, context, token):
             ...
 
@@ -40,6 +43,7 @@ this invocation is occuring.
 First `apply` will call `start_rule` for the matched rule. The result from that is passed to the other methods.
 
  - `start_rule` is called at the start of each parsed rule.
+ - `end_rule` is called at the start of each parsed rule.
  - `terminal` is called when a terminal is parsed.
  - `extend` is called when a given symbol in a rule has been parsed. It is passed both the previous value for that rule
    and the extension_value describing what was parsed for that symbol.
@@ -70,12 +74,14 @@ Then the following methods would get invoked during `apply` (though not necessar
     v1 = builder.start_rule({rule2, 0})
     v2 = builder.terminal({rule2, 0}, 'b')
     v3 = builder.extend({rule2, 0}, v1, v2)
-    v4 = builder.start_rule({rule1, 0})
-    v5 = builder.terminal({rule1, 0}, 'a')
-    v6 = builder.extend({rule1, 0}, v4, v5)
-    v7 = builder.extend({rule1, 1}, v6, v3)
-    v8 = builder.terminal({rule1, 1}, 'c')
-    v9 = builder.extend({rule1, 2}, v7, v8)
+    v4 = builder.end_rule({rule2, 1}, v3)
+    v5 = builder.start_rule({rule1, 0})
+    v6 = builder.terminal({rule1, 0}, 'a')
+    v7 = builder.extend({rule1, 0}, v5, v6)
+    v8 = builder.extend({rule1, 1}, v7, v4)
+    v9 = builder.terminal({rule1, 1}, 'c')
+    v10 = builder.extend({rule1, 2}, v8, v9)
+    v11 = builder.end_rule({rule1, 3}, v10)
 
 Ambiguity
 ---------
@@ -108,10 +114,12 @@ Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` 
     v1 = builder.start_rule({rule1, 0})
     v2 = builder.terminal({rule1, 0}, 'hello')
     v3 = builder.extend({rule1, 0}, v1, v2)
-    v4 = builder.start_rule({rule2, 0})
-    v5 = builder.terminal({rule2, 0}, 'hello')
-    v6 = builder.extend({rule2, 0}, v4, v5)
-    v7 = builder.merge_vertical({None, 0}, [v6, v3])
+    v4 = builder.end_rule({rule1, 1}, v3)
+    v5 = builder.start_rule({rule2, 0})
+    v6 = builder.terminal({rule2, 0}, 'hello')
+    v7 = builder.extend({rule2, 0}, v5, v6)
+    v8 = builder.end_rule({rule2, 1}, v7)
+    v9 = builder.merge_vertical({None, 0}, [v8, v4])
 
 (Note that in this special case where the top level symbol itself is ambiguous, then ``None`` is passed in as the rule
 being merged).
@@ -124,19 +132,24 @@ Here's another example, ambiguously parsing ``["a"]``::
 
     v1 = builder.start_rule({Y, 0})             # After token 0
     v2 = builder.skip_optional({Y, 0}, v1)
-    v3 = builder.start_rule({X, 0})
-    v4 = builder.terminal({X, 0}, 'a')
-    v5 = builder.extend({X, 0}, v3, v4)
-    v6 = builder.start_rule({sentence, 0})
-    v7 = builder.extend({sentence, 0}, v6, v5)
-    v8 = builder.start_rule({Y, 0})             # Before token 0
-    v9 = builder.terminal({Y, 0}, 'a')
-    v10 = builder.extend({Y, 0}, v8, v9)
-    v11 = builder.skip_optional({X, 0}, v3)
-    v12 = builder.extend({sentence, 0}, v6, v11)
-    v13 = builder.extend({sentence, 1}, v7, v2)
-    v14 = builder.extend({sentence, 1}, v12, v10)
-    v15 = builder.merge_horizontal({sentence, 2}, [v13, v14])
+    v3 = builder.end_rule({Y, 1}, v2)
+    v4 = builder.start_rule({X, 0})
+    v5 = builder.terminal({X, 0}, 'a')
+    v6 = builder.extend({X, 0}, v4, v5)
+    v7 = builder.end_rule({X, 1}, v6)
+    v8 = builder.start_rule({sentence, 0})
+    v9 = builder.extend({sentence, 0}, v8, v7)
+    v10 = builder.start_rule({Y, 0})             # Before token 0
+    v11 = builder.terminal({Y, 0}, 'a')
+    v12 = builder.extend({Y, 0}, v10, v11)
+    v13 = builder.end_rule({Y, 1}, v12)
+    v14 = builder.skip_optional({X, 0}, v4)
+    v15 = builder.end_rule({X, 1}, v14)
+    v16 = builder.extend({sentence, 0}, v8, v15)
+    v17 = builder.extend({sentence, 1}, v9, v3)
+    v18 = builder.extend({sentence, 1}, v16, v13)
+    v19 = builder.merge_horizontal({sentence, 2}, [v17, v18])
+    v20 = builder.end_rule({sentence, 2}, v19)
 
 The two above examples give a visual indication of the terminology "vertical" and "horizontal". In the first,
 ``rule1`` and ``rule2`` are ambiguous and in vertically column in the grammar definition. In the second, ``X`` and

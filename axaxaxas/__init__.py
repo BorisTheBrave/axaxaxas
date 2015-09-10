@@ -200,6 +200,11 @@ class Builder(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def end_rule(self, context, prev_value):
+        """Called when a new rule is completed"""
+        pass
+
+    @abstractmethod
     def terminal(self, context, token):
         """Called when a terminal is matched"""
         pass
@@ -242,6 +247,9 @@ class CountingBuilder(Builder):
     def start_rule(self, context):
         return 1
 
+    def end_rule(self, context, prev_value):
+        return prev_value
+
     def terminal(self, context, token):
         return 1
 
@@ -269,6 +277,9 @@ class SingleParseTreeBuilder(Builder):
     def start_rule(self, context):
         return ParseTree(context.rule)
 
+    def end_rule(self, context, prev_value):
+        return prev_value
+
     def terminal(self, context, token):
         return token
 
@@ -294,6 +305,9 @@ class ListBuilder(Builder):
 
     def start_rule(self, context):
         return [self.underlying.start_rule(context)]
+
+    def end_rule(self, context, prev_value):
+        return [self.underlying.end_rule(context, prev_underlying) for prev_underlying in prev_value]
 
     def terminal(self, context, token):
         return [self.underlying.terminal(context, token)]
@@ -400,6 +414,9 @@ class IterBuilder(Builder):
     def start_rule(self, context):
         return thunk_iter([self.underlying.start_rule(context)])
 
+    def end_rule(self, context, prev_value):
+        return thunk_map(prev_value, partial(self.underlying.end_rule, context))
+
     def terminal(self, context, token):
         return thunk_iter([self.underlying.terminal(context, token)])
 
@@ -479,8 +496,15 @@ class ParseForest:
             is_gamma = current_rule.rule.symbols and isinstance(current_rule.rule.symbols[0], GammaNonTerminal)
             if first_time:
                 if current_rule.sources is None:
-                    context = BuilderContext(current_rule.rule, 0, current_rule.start_index, current_rule.end_index)
-                    memo[current_rule] = builder.start_rule(context) if not is_gamma else None
+                    if is_gamma:
+                        value = None
+                    else:
+                        context = BuilderContext(current_rule.rule, 0, current_rule.start_index, current_rule.end_index)
+                        value = builder.start_rule(context)
+                        if current_rule.is_complete:
+                            context = BuilderContext(current_rule.rule, current_rule.state, current_rule.start_index, current_rule.end_index)
+                            value = builder.end_rule(context, value)
+                    memo[current_rule] = value
                 else:
                     stack.append((current_rule, False))
                     for source0, source1 in current_rule.sources:
@@ -539,6 +563,9 @@ class ParseForest:
                     assert not is_gamma
                     context = BuilderContext(rule, current_rule.state, current_rule.start_index, current_rule.end_index)
                     value = builder.merge_horizontal(context, values)
+                if current_rule.is_complete and not is_gamma:
+                    context = BuilderContext(rule, current_rule.state, current_rule.start_index, current_rule.end_index)
+                    value = builder.end_rule(context, value)
                 memo[current_rule] = value
         return memo[self.top_partial_rule]
 

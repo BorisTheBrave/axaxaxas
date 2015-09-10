@@ -378,3 +378,6 @@ class EarleyParserTestCase(unittest.TestCase):
         p.add(ParseRule("top","top",[Terminal("a")]))
     
         self.roundtrip("a")
+
+if __name__ == '__main__':
+    unittest.main()

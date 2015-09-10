@@ -1,6 +1,7 @@
 # This is the example comes from builders.rst
 
 from axaxaxas import ParseRule, Terminal as T, NonTerminal as NT, ParseRuleSet, parse, Builder
+import unittest
 
 
 class LoggingBuilder(Builder):
@@ -52,6 +53,9 @@ class LoggingBuilder(Builder):
     def start_rule(self, context):
         return self.log("start_rule", context)
 
+    def end_rule(self, context, prev_value):
+        return self.log("end_rule", context, prev_value)
+
     def terminal(self, context, token):
         return self.log("terminal", context, token)
 
@@ -74,69 +78,80 @@ class LoggingBuilder(Builder):
         return self.log("merge_vertical", context, values)
 
 
-def run(lcls, head, tokens, output):
-    grammar = ParseRuleSet()
-    for rule_name, rule in sorted(lcls.items(), reverse=True):
-        grammar.add(rule)
-    logging_builder = LoggingBuilder(lcls)
-    parse(grammar, head, tokens).apply(logging_builder)
-    # print(logging_builder.get_text())
-    logging_builder.compare(output)
+class Builder(unittest.TestCase):
+    def parse(self, lcls, head, tokens, output):
+        grammar = ParseRuleSet()
+        for rule_name, rule in sorted(lcls.items(), reverse=True):
+            if isinstance(rule, ParseRule):
+                grammar.add(rule)
+        logging_builder = LoggingBuilder(lcls)
+        parse(grammar, head, tokens).apply(logging_builder)
+        print(logging_builder.get_text())
+        logging_builder.compare(output)
 
 
-def ex1():
-    rule1 = ParseRule("rule 1", [T("a"), NT("rule 2"), T("c")])
-    rule2 = ParseRule("rule 2", [T("b")])
+    def test_ex1(self):
+        rule1 = ParseRule("rule 1", [T("a"), NT("rule 2"), T("c")])
+        rule2 = ParseRule("rule 2", [T("b")])
 
-    run(locals(), "rule 1", ["a", "b", "c"], """
+        self.parse(locals(), "rule 1", ["a", "b", "c"], """
     v1 = builder.start_rule({rule2, 0})
     v2 = builder.terminal({rule2, 0}, 'b')
     v3 = builder.extend({rule2, 0}, v1, v2)
-    v4 = builder.start_rule({rule1, 0})
-    v5 = builder.terminal({rule1, 0}, 'a')
-    v6 = builder.extend({rule1, 0}, v4, v5)
-    v7 = builder.extend({rule1, 1}, v6, v3)
-    v8 = builder.terminal({rule1, 1}, 'c')
-    v9 = builder.extend({rule1, 2}, v7, v8)
-    """)
-ex1()
+    v4 = builder.end_rule({rule2, 1}, v3)
+    v5 = builder.start_rule({rule1, 0})
+    v6 = builder.terminal({rule1, 0}, 'a')
+    v7 = builder.extend({rule1, 0}, v5, v6)
+    v8 = builder.extend({rule1, 1}, v7, v4)
+    v9 = builder.terminal({rule1, 1}, 'c')
+    v10 = builder.extend({rule1, 2}, v8, v9)
+    v11 = builder.end_rule({rule1, 3}, v10)
+        """)
 
 
-def ex2():
-    rule1 = ParseRule("sentence", [T("hello")])
-    rule2 = ParseRule("sentence", [T("hello")])
-    run(locals(), "sentence", ["hello"], """
+    def test_ex2(self):
+        rule1 = ParseRule("sentence", [T("hello")])
+        rule2 = ParseRule("sentence", [T("hello")])
+        self.parse(locals(), "sentence", ["hello"], """
     v1 = builder.start_rule({rule1, 0})
     v2 = builder.terminal({rule1, 0}, 'hello')
     v3 = builder.extend({rule1, 0}, v1, v2)
-    v4 = builder.start_rule({rule2, 0})
-    v5 = builder.terminal({rule2, 0}, 'hello')
-    v6 = builder.extend({rule2, 0}, v4, v5)
-    v7 = builder.merge_vertical({None, 0}, [v6, v3])
-    """)
-ex2()
+    v4 = builder.end_rule({rule1, 1}, v3)
+    v5 = builder.start_rule({rule2, 0})
+    v6 = builder.terminal({rule2, 0}, 'hello')
+    v7 = builder.extend({rule2, 0}, v5, v6)
+    v8 = builder.end_rule({rule2, 1}, v7)
+    v9 = builder.merge_vertical({None, 0}, [v8, v4])
+        """)
 
 
-def ex3():
-    sentence = ParseRule("sentence", [NT("X"), NT("Y")])
-    X = ParseRule("X", [T("a", optional=True)])
-    Y = ParseRule("Y", [T("a", optional=True)])
+    def test_ex3(self):
+        sentence = ParseRule("sentence", [NT("X"), NT("Y")])
+        X = ParseRule("X", [T("a", optional=True)])
+        Y = ParseRule("Y", [T("a", optional=True)])
 
-    run(locals(), "sentence", ["a"], """
+        self.parse(locals(), "sentence", ["a"], """
     v1 = builder.start_rule({Y, 0})             # After token 0
     v2 = builder.skip_optional({Y, 0}, v1)
-    v3 = builder.start_rule({X, 0})
-    v4 = builder.terminal({X, 0}, 'a')
-    v5 = builder.extend({X, 0}, v3, v4)
-    v6 = builder.start_rule({sentence, 0})
-    v7 = builder.extend({sentence, 0}, v6, v5)
-    v8 = builder.start_rule({Y, 0})             # Before token 0
-    v9 = builder.terminal({Y, 0}, 'a')
-    v10 = builder.extend({Y, 0}, v8, v9)
-    v11 = builder.skip_optional({X, 0}, v3)
-    v12 = builder.extend({sentence, 0}, v6, v11)
-    v13 = builder.extend({sentence, 1}, v7, v2)
-    v14 = builder.extend({sentence, 1}, v12, v10)
-    v15 = builder.merge_horizontal({sentence, 2}, [v13, v14])
-    """)
-ex3()
+    v3 = builder.end_rule({Y, 1}, v2)
+    v4 = builder.start_rule({X, 0})
+    v5 = builder.terminal({X, 0}, 'a')
+    v6 = builder.extend({X, 0}, v4, v5)
+    v7 = builder.end_rule({X, 1}, v6)
+    v8 = builder.start_rule({sentence, 0})
+    v9 = builder.extend({sentence, 0}, v8, v7)
+    v10 = builder.start_rule({Y, 0})             # Before token 0
+    v11 = builder.terminal({Y, 0}, 'a')
+    v12 = builder.extend({Y, 0}, v10, v11)
+    v13 = builder.end_rule({Y, 1}, v12)
+    v14 = builder.skip_optional({X, 0}, v4)
+    v15 = builder.end_rule({X, 1}, v14)
+    v16 = builder.extend({sentence, 0}, v8, v15)
+    v17 = builder.extend({sentence, 1}, v9, v3)
+    v18 = builder.extend({sentence, 1}, v16, v13)
+    v19 = builder.merge_horizontal({sentence, 2}, [v17, v18])
+    v20 = builder.end_rule({sentence, 2}, v19)
+        """)
+
+if __name__ == '__main__':
+    unittest.main()
