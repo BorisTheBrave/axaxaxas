@@ -67,16 +67,15 @@ In other words, we've parsed the token stream ``["a", "b", "c"]`` with the follo
 
 Then the following methods would get invoked during `apply` (though not necessary in this order)::
 
-    v1 = builder.start_rule({rule1, 0})
-    v2 = builder.terminal({rule1, 0}, "a")
-    v3 = builder.extend({rule1, 0}, v1, v2)
-    v4 = builder.start_rule({rule2, 0})
-    v5 = builder.token({rule2, 0}, "b")
-    v6 = builder.extend({rule2, 0}, v4, v5)
-    v7 = builder.extend({rule1, 1}, v3, v6)
-    v8 = builder.token({rule1, 2}, "c")
+    v1 = builder.start_rule({rule2, 0})
+    v2 = builder.terminal({rule2, 0}, 'b')
+    v3 = builder.extend({rule2, 0}, v1, v2)
+    v4 = builder.start_rule({rule1, 0})
+    v5 = builder.terminal({rule1, 0}, 'a')
+    v6 = builder.extend({rule1, 0}, v4, v5)
+    v7 = builder.extend({rule1, 1}, v6, v3)
+    v8 = builder.terminal({rule1, 1}, 'c')
     v9 = builder.extend({rule1, 2}, v7, v8)
-    return v9
 
 Ambiguity
 ---------
@@ -107,12 +106,12 @@ Here is an example of the call sequence for an ambiguous parse of ``["hello"]`` 
     rule2 = ParseRule("sentence", [T("hello")])
 
     v1 = builder.start_rule({rule1, 0})
-    v2 = builder.terminal({rule1, 0}, "hello")
+    v2 = builder.terminal({rule1, 0}, 'hello')
     v3 = builder.extend({rule1, 0}, v1, v2)
     v4 = builder.start_rule({rule2, 0})
-    v5 = builder.terminal({rule2, 0}, "hello")
+    v5 = builder.terminal({rule2, 0}, 'hello')
     v6 = builder.extend({rule2, 0}, v4, v5)
-    v7 = builder.merge_vertical({None, 0}, [v3, v6])
+    v7 = builder.merge_vertical({None, 0}, [v6, v3])
 
 (Note that in this special case where the top level symbol itself is ambiguous, then ``None`` is passed in as the rule
 being merged).
@@ -123,21 +122,21 @@ Here's another example, ambiguously parsing ``["a"]``::
     X        = ParseRule("X", [T("a", optional=True)])
     Y        = ParseRule("Y", [T("a", optional=True)])
 
-    v1  = builder.start_rule({sentence, 0})
-    v2  = builder.start_rule({X, 0})
-    v3  = builder.terminal({X, 0}, "a")
-    v4  = builder.extend({X, 0}, v2, v3)
-    v5  = builder.extend({sentence, 0}, v1, v4)
-    v6  = builder.skip_optional({X, 0}, v2)
-    v7  = builder.extend({sentence, 0}, v1, v6)
-    v8  = builder.start_rule({Y, 0})            # Before token 0
-    v9  = builder.terminal({Y, 0}, "a")
+    v1 = builder.start_rule({Y, 0})             # After token 0
+    v2 = builder.skip_optional({Y, 0}, v1)
+    v3 = builder.start_rule({X, 0})
+    v4 = builder.terminal({X, 0}, 'a')
+    v5 = builder.extend({X, 0}, v3, v4)
+    v6 = builder.start_rule({sentence, 0})
+    v7 = builder.extend({sentence, 0}, v6, v5)
+    v8 = builder.start_rule({Y, 0})             # Before token 0
+    v9 = builder.terminal({Y, 0}, 'a')
     v10 = builder.extend({Y, 0}, v8, v9)
-    v11 = builder.extend({sentence, 1}, v7, v10)
-    v12 = builder.start_rule({Y, 0})            # After token 0
-    v13 = builder.skip_optional({Y, 0}, v12)
-    v14 = builder.extend({sentence, 1}, v5, v13)
-    v15 = builder.merge_horizontal({sentence, 2}, [v11, v14])
+    v11 = builder.skip_optional({X, 0}, v3)
+    v12 = builder.extend({sentence, 0}, v6, v11)
+    v13 = builder.extend({sentence, 1}, v7, v2)
+    v14 = builder.extend({sentence, 1}, v12, v10)
+    v15 = builder.merge_horizontal({sentence, 2}, [v13, v14])
 
 The two above examples give a visual indication of the terminology "vertical" and "horizontal". In the first,
 ``rule1`` and ``rule2`` are ambiguous and in vertically column in the grammar definition. In the second, ``X`` and

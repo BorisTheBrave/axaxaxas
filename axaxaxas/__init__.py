@@ -97,7 +97,7 @@ class ParseRule:
         return "ParseRule({0!r}, {1!r})".format(self.head, self.symbols)
 
     def __str__(self):
-        return "<{0}> ::= {1}".format(self.head, " ".join(self.symbols))
+        return "<{0}> ::= {1}".format(self.head, " ".join(map(str,self.symbols)))
 
 
 class ParseTree:
