@@ -28,13 +28,15 @@ def simplify_parse_tree(parse_tree):
         return parse_tree
     return "(" + parse_tree.rule.name + ": " + " ".join(map(simplify_parse_tree, parse_tree.children)) + ")"
 
-
 class EarleyParserTestCase(unittest.TestCase):
     def parse(self, text, trees):
-        result_trees = set(map(simplify_parse_tree, parse(self.p, "top", lex(text))))
+        parse_forest = parse(self.p, "top", lex(text))
+        result_trees1 = set(map(simplify_parse_tree, parse_forest))
+        result_trees2 = set(map(simplify_parse_tree, parse_forest.all()))
         expected_trees = set(trees)
-        extra_results = result_trees - expected_trees
-        missing_results = expected_trees - result_trees
+        self.assertSetEqual(result_trees1, result_trees2)
+        extra_results = result_trees1 - expected_trees
+        missing_results = expected_trees - result_trees1
         t = []
         if extra_results:
             t.append("Parsed unexpected parse trees:\n" + "\n".join(extra_results))

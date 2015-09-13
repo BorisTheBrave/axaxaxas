@@ -38,13 +38,15 @@ class LoggingBuilder(Builder):
     def get_text(self):
         return "\n".join(self.lines)
 
-    def compare(self, output):
+    def compare(self, output, test_case=None):
         i = 0
         for oline in output.split("\n"):
             if "#" in oline: oline = oline[:oline.index("#")]
             oline = oline.strip()
             if not oline: continue
             if oline != self.lines[i]:
+                if test_case is not None:
+                    test_case.assertEqual(oline, self.lines[i])
                 print(repr(oline))
                 print(repr(self.lines[i]))
                 assert oline == self.lines[i], "Failed at line {}".format(i+1)
@@ -87,7 +89,7 @@ class Builder(unittest.TestCase):
         logging_builder = LoggingBuilder(lcls)
         parse(grammar, head, tokens).apply(logging_builder)
         print(logging_builder.get_text())
-        logging_builder.compare(output)
+        logging_builder.compare(output, self)
 
 
     def test_ex1(self):

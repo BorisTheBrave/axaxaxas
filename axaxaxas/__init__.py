@@ -331,7 +331,7 @@ class ListBuilder(Builder):
     def merge(self, context, values):
         results = []
         for value in values:
-            results.append(value)
+            results.extend(value)
         return results
 
 def make_list_builder(builder):
@@ -552,8 +552,8 @@ class ParseForest:
                         if len(current_values) == 1:
                             value = current_values[0]
                         else:
-                            context = BuilderContext(rule, current_rule.state - 1, source0.end_index, current_rule.end_index)
-                            value = builder.merge_vertical(context, current_values)
+                            merge_context = BuilderContext(rule, symbol_index, source0.end_index, current_rule.end_index)
+                            value = builder.merge_vertical(merge_context, current_values)
                         if not is_gamma:
                             value = builder.extend(context, value0, value)
                     values.append(value)
